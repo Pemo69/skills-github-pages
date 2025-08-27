@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <title>เกมภาษี 7%</title>
+  <style>
+    body { font-family: 'Sarabun', sans-serif; text-align: center; padding: 20px; }
+    input, button { padding: 10px; font-size: 16px; margin: 5px; }
+    #gameArea, #endArea { display: none; }
+    #timer { font-weight: bold; color: red; }
+    table { margin: 20px auto; border-collapse: collapse; }
+    th, td { border: 1px solid #999; padding: 6px 10px; }
+    .correct { color: green; font-weight: bold; }
+    .wrong { color: red; font-weight: bold; }
+  </style>
+</head>
+<body>
+
+  <!-- หน้าเริ่ม -->
+  <div id="startArea">
+    <h1>🎮 เกมคำนวณภาษี 7%</h1>
+    <p>กรุณาใส่ชื่อของคุณก่อนเริ่มเกม</p>
+    <input type="text" id="playerName" placeholder="ชื่อผู้เล่น">
+    <br>
+    <button onclick="startGame()">เริ่มเกม</button>
+  </div>
+
+  <!-- หน้าเล่น -->
+  <div id="gameArea">
+    <h2>ข้อที่ <span id="questionNumber">1</span> / 10</h2>
+    <p id="questionText">ราคาสินค้า: </p>
+    <p id="timer">⏱️ เวลา: 15</p>
+    <input type="number" id="answer" placeholder="ราคาหลังรวมภาษี">
+    <br>
+    <button onclick="submitAnswer()">ตอบ</button>
+    <p id="feedback"></p>
+    <p>คะแนน: <span id="score">0</span></p>
+  </div>
+
+  <!-- หน้าจบ -->
+  <div id="endArea">
+    <h2>✅ เกมจบแล้ว!</h2>
+    <p>คะแนนรวม: <span id="finalScore"></span> / 10</p>
+    <h3>🏆 ตารางอันดับ</h3>
+    <div id="leaderboard"></div>
+  </div>
+
+  <!-- เสียง -->
+  <audio id="soundCorrect" src="https://www.soundjay.com/buttons/sounds/button-4.mp3"></audio>
+  <audio id="soundWrong" src="https://www.soundjay.com/buttons/sounds/button-10.mp3"></audio>
+  <audio id="soundTimeout" src="https://www.soundjay.com/button/beep-07.mp3"></audio>
+
+  <script>
+    let playerName = "";
+    let questionCount = 0;
+    let score = 0;
+    let currentPrice = 0;
+    let timer, timeLeft = 15;
+
+    function startGame() {
+      const nameInput = document.getElementById("playerName").value.trim();
+      if (!nameInput) return alert("กรุณาใส่ชื่อก่อนเริ่มเกม");
+      playerName = nameInput;
+      questionCount = 0;
+      score = 0;
+      document.getElementById("score").innerText = score;
+      document.getElementById("startArea").style.display = "none";
+      document.getElementById("gameArea").style.display = "block";
+      nextQuestion();
+    }
+
+    function nextQuestion() {
+      if (questionCount >= 10) return endGame();
+      questionCount++;
+      document.getElementById("questionNumber").innerText = questionCount;
+      currentPrice = Math.floor(Math.random() * 901 + 100); // 100-1000
+      document.getElementById("questionText").innerText = `ราคาสินค้า: ${currentPrice} บาท (ยังไม่รวมภาษี)`;
+      document.getElementById("answer").value = "";
+      document.getElementById("feedback").innerText = "";
+
+      // ตั้งเวลาใหม่
+      clearInterval(timer);
+      timeLeft = 15;
+      document.getElementById("timer").innerText = `⏱️ เวลา: ${timeLeft}`;
+      timer = setInterval(countdown, 1000);
+    }
+
+    function countdown() {
+      timeLeft--;
+      document.getElementById("timer").innerText = `⏱️ เวลา: ${timeLeft}`;
+      if (timeLeft <= 0) {
+        clearInterval(timer);
+        document.getElementById("feedback").innerHTML = `<span class="wrong">⌛ หมดเวลา!</span>`;
+        document.getElementById("soundTimeout").play();
+        setTimeout(nextQuestion, 1500);
+      }
+    }
+
+    function submitAnswer() {
+      if (timeLeft <= 0) return; // กดหลังหมดเวลาไม่ให้คิด
+
+      clearInterval(timer);
+      const userAnswer = parseFloat(document.getElementById("answer").value);
+      const correctAnswer = +(currentPrice * 1.07).toFixed(2);
+
+      if (Math.abs(userAnswer - correctAnswer) < 0.01) {
+        score++;
+        document.getElementById("feedback").innerHTML = `<span class="correct">✅ ถูกต้อง!</span><br>วิธีคิด: ${currentPrice} × 1.07 = ${correctAnswer}`;
+        document.getElementById("soundCorrect").play();
+      } else {
+        document.getElementById("feedback").innerHTML = `<span class="wrong">❌ ผิด!</span><br>คำตอบที่ถูกคือ ${correctAnswer}<br>วิธีคิด: ${currentPrice} × 1.07 = ${correctAnswer}`;
+        document.getElementById("soundWrong").play();
+      }
+
+      document.getElementById("score").innerText = score;
+      setTimeout(nextQuestion, 2500);
+    }
+
+    function endGame() {
+      document.getElementById("gameArea").style.display = "none";
+      document.getElementById("endArea").style.display = "block";
+      document.getElementById("finalScore").innerText = score;
+
+      const oldData = JSON.parse(localStorage.getItem("vatLeaderboard") || "[]");
+      oldData.push({ name: playerName, score });
+      oldData.sort((a, b) => b.score - a.score);
+      localStorage.setItem("vatLeaderboard", JSON.stringify(oldData.slice(0, 10)));
+
+      showLeaderboard();
+
+      // ย้อนกลับหน้าแรกอัตโนมัติ
+      setTimeout(() => {
+        document.getElementById("endArea").style.display = "none";
+        document.getElementById("startArea").style.display = "block";
+        document.getElementById("playerName").value = "";
+      }, 8000);
+    }
+
+    function showLeaderboard() {
+      const data = JSON.parse(localStorage.getItem("vatLeaderboard") || "[]");
+      let html = "<table><tr><th>อันดับ</th><th>ชื่อ</th><th>คะแนน</th></tr>";
+      data.forEach((item, index) => {
+        html += `<tr><td>${index + 1}</td><td>${item.name}</td><td>${item.score}</td></tr>`;
+      });
+      html += "</table>";
+      document.getElementById("leaderboard").innerHTML = html;
+    }
+  </script>
+
+</body>
+</html>
